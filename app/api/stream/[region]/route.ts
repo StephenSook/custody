@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { type Region, readQuerier } from "@/src/data/pool";
 import { getConsentSnapshot, getSpendSnapshot } from "@/src/data/reads";
+import { assertWithinRateLimit } from "@/src/services/rateLimit";
 
 // A live consistency demo must never serve cached state.
 export const dynamic = "force-dynamic";
@@ -13,6 +14,11 @@ const HEARTBEAT_MS = 15_000;
  * Server-Sent Events stream for one region. Polls that region's projections for the given
  * subject and pushes a "state" event whenever they change. This is the primary realtime
  * transport (Vercel cannot host WebSocket servers); a managed provider is the hot standby.
+ *
+ * Demo seam: userId/minorId come from the query string and the demo data is synthetic
+ * (no real minors). In production the subject MUST be derived from the caller's session
+ * and a custody check, returning 403 for any subject the caller does not own; do not ship
+ * this query-param read against real data.
  */
 export async function GET(
   req: NextRequest,
@@ -22,6 +28,17 @@ export async function GET(
   if (!REGIONS.includes(region as Region)) {
     return new Response("unknown region", { status: 404 });
   }
+
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown";
+  try {
+    await assertWithinRateLimit(`stream:${ip}`);
+  } catch {
+    return new Response("rate limit exceeded", { status: 429 });
+  }
+
   const userId = req.nextUrl.searchParams.get("userId");
   const minorId = req.nextUrl.searchParams.get("minorId");
   const querier = readQuerier(region as Region);
@@ -31,9 +48,37 @@ export async function GET(
     start(controller) {
       let closed = false;
       let lastState = "";
+      let pollTimer: ReturnType<typeof setInterval> | undefined;
+      let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+
+      const cleanup = () => {
+        if (closed) {
+          return;
+        }
+        closed = true;
+        if (pollTimer) {
+          clearInterval(pollTimer);
+        }
+        if (heartbeatTimer) {
+          clearInterval(heartbeatTimer);
+        }
+        try {
+          controller.close();
+        } catch {
+          // already closed
+        }
+      };
 
       const send = (event: string, data: unknown) => {
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        if (closed) {
+          return;
+        }
+        try {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          // Controller closed between the guard and the enqueue (race with abort).
+          cleanup();
+        }
       };
 
       const poll = async () => {
@@ -59,6 +104,12 @@ export async function GET(
             send("state", { ...state, at: Date.now() });
           }
         } catch (err) {
+          if (closed) {
+            return;
+          }
+          // Log server-side so a permanently-failing poll is diagnosable, not just a
+          // stream that heartbeats forever while every read fails.
+          console.error("[sse] poll failed", { region, userId, minorId, err });
           send("error", { message: err instanceof Error ? err.message : "poll failed" });
         }
       };
@@ -67,24 +118,18 @@ export async function GET(
       send("ready", { region });
       void poll();
 
-      const pollTimer = setInterval(() => void poll(), POLL_MS);
-      const heartbeatTimer = setInterval(() => {
-        controller.enqueue(encoder.encode(": heartbeat\n\n"));
-      }, HEARTBEAT_MS);
-
-      const cleanup = () => {
+      pollTimer = setInterval(() => void poll(), POLL_MS);
+      heartbeatTimer = setInterval(() => {
         if (closed) {
           return;
         }
-        closed = true;
-        clearInterval(pollTimer);
-        clearInterval(heartbeatTimer);
         try {
-          controller.close();
+          controller.enqueue(encoder.encode(": heartbeat\n\n"));
         } catch {
-          // already closed
+          cleanup();
         }
-      };
+      }, HEARTBEAT_MS);
+
       req.signal.addEventListener("abort", cleanup);
     },
   });
