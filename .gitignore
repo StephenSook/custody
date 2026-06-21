@@ -40,3 +40,6 @@ pnpm-debug.log*
 .vscode/
 .idea/
 *.swp
+
+# playwright mcp artifacts
+.playwright-mcp/
