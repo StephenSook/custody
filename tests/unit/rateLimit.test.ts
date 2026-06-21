@@ -11,6 +11,8 @@ function unconfiguredProduction() {
   vi.stubEnv("VERCEL_ENV", "production");
   vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
   vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+  vi.stubEnv("KV_REST_API_URL", "");
+  vi.stubEnv("KV_REST_API_TOKEN", "");
 }
 
 afterEach(() => {
@@ -36,6 +38,8 @@ describe("assertWithinRateLimit", () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
     vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+    vi.stubEnv("KV_REST_API_URL", "");
+    vi.stubEnv("KV_REST_API_TOKEN", "");
     const assert = await freshAssert();
     await expect(assert("any-key")).resolves.toBeUndefined();
   });

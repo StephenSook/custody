@@ -13,8 +13,10 @@ function getLimiter(): Ratelimit | null {
   if (limiter !== undefined) {
     return limiter;
   }
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  // Accept either naming scheme: the Upstash-native integration injects UPSTASH_REDIS_REST_*,
+  // the Vercel Marketplace Redis (Upstash KV) product injects KV_REST_API_*.
+  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
   if (!url || !token) {
     // Fail closed in production: a missing limiter must not silently disable the named
     // defense. In non-production, warn loudly so the gap is visible in logs.
