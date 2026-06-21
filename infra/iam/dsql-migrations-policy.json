@@ -1,0 +1,14 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DsqlMigrationsConnectAdmin",
+      "Effect": "Allow",
+      "Action": "dsql:DbConnectAdmin",
+      "Resource": [
+        "arn:aws:dsql:us-east-1:<AWS_ACCOUNT_ID>:cluster/<CLUSTER_ID_US_EAST_1>",
+        "arn:aws:dsql:us-east-2:<AWS_ACCOUNT_ID>:cluster/<CLUSTER_ID_US_EAST_2>"
+      ]
+    }
+  ]
+}
