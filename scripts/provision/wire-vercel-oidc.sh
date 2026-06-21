@@ -52,8 +52,10 @@ cat > /tmp/custody-trust.json <<JSON
   "Principal": { "Federated": "${PROVIDER_ARN}" },
   "Action": "sts:AssumeRoleWithWebIdentity",
   "Condition": {
-    "StringEquals": { "${ISSUER_HOST}:aud": "${AUD}" },
-    "StringLike": { "${ISSUER_HOST}:sub": "owner:${TEAM_SLUG}:project:${PROJECT}:environment:*" }
+    "StringEquals": {
+      "${ISSUER_HOST}:aud": "${AUD}",
+      "${ISSUER_HOST}:sub": "owner:${TEAM_SLUG}:project:${PROJECT}:environment:production"
+    }
   }
 }]}
 JSON
