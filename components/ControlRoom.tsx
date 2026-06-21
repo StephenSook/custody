@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useState } from "react";
 import { ConsentControls } from "./ConsentControls";
 import { ContentionPanel } from "./ContentionPanel";
 import { HashChainLedger } from "./HashChainLedger";
@@ -27,6 +28,9 @@ const DEMO_MINOR = DEMO_USER;
 export function ControlRoom() {
   const east = useRegionStream("east", DEMO_USER, DEMO_MINOR);
   const west = useRegionStream("west", DEMO_USER, DEMO_MINOR);
+  // Latest measured cross-region latency plus a counter that re-triggers the map pulse on
+  // every commit (even when the measured value repeats).
+  const [latency, setLatency] = useState<{ ms: number | null; key: number }>({ ms: null, key: 0 });
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8">
@@ -52,7 +56,12 @@ export function ControlRoom() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Two-region link" kicker="strong consistency" className="lg:col-span-3">
-          <RegionArcMap east={east.status} west={west.status} lastLatencyMs={null} />
+          <RegionArcMap
+            east={east.status}
+            west={west.status}
+            lastLatencyMs={latency.ms}
+            pulseKey={latency.key}
+          />
         </Panel>
 
         <Panel title="Region A" kicker="us-east-1">
@@ -69,7 +78,11 @@ export function ControlRoom() {
         </Panel>
 
         <Panel title="Parent actions" kicker="server actions" className="lg:col-span-3">
-          <ConsentControls userId={DEMO_USER} minorId={DEMO_MINOR} />
+          <ConsentControls
+            userId={DEMO_USER}
+            minorId={DEMO_MINOR}
+            onLatency={(ms) => setLatency((p) => ({ ms, key: p.key + 1 }))}
+          />
         </Panel>
 
         <Panel title="Tamper-evident ledger" kicker="sha-256 hash chain" className="lg:col-span-3">

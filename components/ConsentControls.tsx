@@ -18,14 +18,25 @@ function uuid(): string {
   return crypto.randomUUID();
 }
 
-export function ConsentControls({ userId, minorId }: { userId: string; minorId: string }) {
+export function ConsentControls({
+  userId,
+  minorId,
+  onLatency,
+}: {
+  userId: string;
+  minorId: string;
+  onLatency?: (ms: number | null) => void;
+}) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
 
   const run = (action: () => Promise<unknown>, label: string) => {
     startTransition(async () => {
       try {
-        await action();
+        const result = await action();
+        if (result && typeof result === "object" && "crossRegionMs" in result) {
+          onLatency?.((result as { crossRegionMs: number | null }).crossRegionMs);
+        }
         setMessage(`${label}: committed`);
       } catch (err) {
         setMessage(`${label}: ${err instanceof Error ? err.message : "failed"}`);

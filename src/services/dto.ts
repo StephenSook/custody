@@ -5,6 +5,8 @@ export interface ConsentActionResult {
   status: string;
   seq: number;
   entryHash: string;
+  // Measured ms for the committed change to be readable from the peer region's endpoint.
+  crossRegionMs: number | null;
 }
 
 export interface SpendActionResult {
@@ -13,6 +15,7 @@ export interface SpendActionResult {
   totalMinor: string;
   seq: number;
   entryHash: string;
+  crossRegionMs: number | null;
 }
 
 export interface AgeProofResult {
