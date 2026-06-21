@@ -56,33 +56,36 @@ export function getPool(region: Region): AuroraDSQLPool {
  * in BEGIN/COMMIT, rolls back on error, and is retried as a whole on OCC conflict
  * (SQLSTATE 40001) by withRetry. The work function must be a pure write transaction.
  */
-export function makeTxnRunner(region: Region): TxnRunner {
+export function makeTxnRunner(region: Region, onRetry?: () => void): TxnRunner {
   return {
     run<T>(fn: (q: Querier) => Promise<T>): Promise<T> {
-      return withRetry(async () => {
-        const client: PoolClient = await getPool(region).connect();
-        try {
-          await client.query("BEGIN");
-          const querier: Querier = {
-            async query<R extends QueryRow = QueryRow>(text: string, params?: unknown[]) {
-              const res = await client.query(text, params);
-              return { rows: res.rows as R[], rowCount: res.rowCount ?? 0 };
-            },
-          };
-          const result = await fn(querier);
-          await client.query("COMMIT");
-          return result;
-        } catch (err) {
+      return withRetry(
+        async () => {
+          const client: PoolClient = await getPool(region).connect();
           try {
-            await client.query("ROLLBACK");
-          } catch {
-            // Surface the original error, not a rollback failure.
+            await client.query("BEGIN");
+            const querier: Querier = {
+              async query<R extends QueryRow = QueryRow>(text: string, params?: unknown[]) {
+                const res = await client.query(text, params);
+                return { rows: res.rows as R[], rowCount: res.rowCount ?? 0 };
+              },
+            };
+            const result = await fn(querier);
+            await client.query("COMMIT");
+            return result;
+          } catch (err) {
+            try {
+              await client.query("ROLLBACK");
+            } catch {
+              // Surface the original error, not a rollback failure.
+            }
+            throw err;
+          } finally {
+            client.release();
           }
-          throw err;
-        } finally {
-          client.release();
-        }
-      });
+        },
+        { onRetry },
+      );
     },
   };
 }

@@ -94,4 +94,22 @@ describe("withRetry", () => {
     // delay = backoff + random()*backoff; random()=1 gives exactly 2x the backoff.
     expect(delays).toEqual([100, 200]);
   });
+
+  it("calls onRetry once per 40001 retry", async () => {
+    let calls = 0;
+    const fn = async () => {
+      calls++;
+      if (calls < 3) throw occError();
+      return "ok";
+    };
+    const onRetry = vi.fn();
+    await withRetry(fn, { sleep: noSleep, maxRetries: 5, onRetry });
+    expect(onRetry).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not call onRetry on first success", async () => {
+    const onRetry = vi.fn();
+    await withRetry(async () => "ok", { sleep: noSleep, onRetry });
+    expect(onRetry).not.toHaveBeenCalled();
+  });
 });

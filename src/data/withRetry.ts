@@ -18,6 +18,8 @@ export interface WithRetryOptions {
   sleep?: (ms: number) => Promise<void>;
   /** Injectable for tests. Defaults to Math.random. */
   random?: () => number;
+  /** Called once each time a 40001 conflict is caught and a retry is scheduled. */
+  onRetry?: () => void;
 }
 
 function isOccConflict(err: unknown): boolean {
@@ -51,6 +53,7 @@ export async function withRetry<T>(
       if (!isOccConflict(err) || attempt === maxRetries) {
         throw err;
       }
+      options.onRetry?.();
       const backoff = baseDelayMs * 2 ** attempt;
       const jitter = random() * backoff;
       await sleep(backoff + jitter);

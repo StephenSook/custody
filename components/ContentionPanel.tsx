@@ -1,75 +1,56 @@
 "use client";
 
 import { useState } from "react";
-import { OCC_SQLSTATE, withRetry } from "@/src/data/withRetry";
 
-interface Writer {
-  attempts: number;
-  committed: boolean;
+interface BurstResult {
+  mode: "hot" | "spread";
+  writers: number;
+  committed: number;
+  conflicts: number;
+  forked: boolean;
+  ms: number;
+  seqs?: number[];
 }
 
-// A write whose commit conflicts (SQLSTATE 40001) up to maxConflicts times, then succeeds.
-// This drives the REAL withRetry wrapper so the panel demonstrates the actual OCC retry
-// algorithm resolving conflicts. The full-scale contention test runs live against DSQL.
-function conflictingOp(probability: number, maxConflicts: number) {
-  let conflicts = 0;
-  return async () => {
-    if (conflicts < maxConflicts && Math.random() < probability) {
-      conflicts++;
-      throw Object.assign(new Error("serialization failure"), { code: OCC_SQLSTATE });
-    }
-    return true;
-  };
-}
+const WRITERS = 8;
 
-const WRITERS = 24;
-
+/**
+ * Fires real concurrent appends against the live Aurora DSQL cluster via /api/contention-burst
+ * and shows the real outcome: how many SQLSTATE 40001 (OC000) commit conflicts the retry
+ * wrapper resolved and that the chain stayed unforked. Not a simulation.
+ */
 export function ContentionPanel() {
-  const [hotKey, setHotKey] = useState(false);
-  const [writers, setWriters] = useState<Writer[]>([]);
+  const [hotKey, setHotKey] = useState(true);
+  const [result, setResult] = useState<BurstResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fire = async () => {
     setRunning(true);
-    setWriters([]);
-    const probability = hotKey ? 0.85 : 0.04;
-    const maxConflicts = hotKey ? 5 : 1;
-    const sleep = (ms: number) =>
-      new Promise<void>((resolve) => setTimeout(resolve, Math.min(ms, 40)));
-    const results = await Promise.all(
-      Array.from({ length: WRITERS }, async () => {
-        const op = conflictingOp(probability, maxConflicts);
-        let attempts = 0;
-        try {
-          await withRetry(
-            async () => {
-              attempts++;
-              return op();
-            },
-            { sleep, maxRetries: 10, baseDelayMs: 8 },
-          );
-          return { attempts, committed: true };
-        } catch (err) {
-          // An exhausted-retry OCC conflict legitimately means not committed. A non-OCC
-          // throw is a real defect, not expected contention, so do not hide it behind a red cell.
-          if (!(err instanceof Error) || (err as { code?: string }).code !== OCC_SQLSTATE) {
-            console.error("contention writer threw a non-OCC error", err);
-          }
-          return { attempts, committed: false };
-        }
-      }),
-    );
-    setWriters(results);
-    setRunning(false);
+    setError(null);
+    setResult(null);
+    try {
+      const mode = hotKey ? "hot" : "spread";
+      const res = await fetch(`/api/contention-burst?mode=${mode}&n=${WRITERS}`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(`burst ${res.status}`);
+      }
+      setResult((await res.json()) as BurstResult);
+    } catch (err) {
+      console.error("contention burst failed", err);
+      setError("burst unavailable");
+    } finally {
+      setRunning(false);
+    }
   };
 
-  const totalAttempts = writers.reduce((sum, w) => sum + w.attempts, 0);
-  const retries = totalAttempts - writers.length;
-  const conflictRate = totalAttempts > 0 ? Math.round((retries / totalAttempts) * 100) : 0;
-  const committed = writers.filter((w) => w.committed).length;
-  const cells: (Writer | null)[] = writers.length
-    ? writers
-    : Array.from({ length: WRITERS }, () => null);
+  const committed = result?.committed ?? 0;
+  const writers = result?.writers ?? WRITERS;
+  const cells: (boolean | null)[] = Array.from({ length: writers }, (_, i) =>
+    result ? i < committed : null,
+  );
 
   return (
     <div className="space-y-3">
@@ -80,7 +61,7 @@ export function ContentionPanel() {
           onClick={() => void fire()}
           className="rounded-md border border-accent-soft px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-accent transition hover:bg-accent/10 disabled:opacity-50"
         >
-          {running ? "writing" : "fire 24 writers"}
+          {running ? "writing live" : `fire ${WRITERS} writers`}
         </button>
         <label className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-muted">
           <input
@@ -91,19 +72,13 @@ export function ContentionPanel() {
           hot key (force contention)
         </label>
         <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
-          occ retry on 40001
+          live · sqlstate 40001
         </span>
       </div>
 
       <div className="grid grid-cols-12 gap-1">
-        {cells.map((writer, i) => {
-          const cls = !writer
-            ? "bg-surface-2"
-            : !writer.committed
-              ? "bg-danger"
-              : writer.attempts === 1
-                ? "bg-accent"
-                : "bg-warn";
+        {cells.map((ok, i) => {
+          const cls = ok === null ? "bg-surface-2" : ok ? "bg-accent" : "bg-danger";
           // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length, non-reordering grid
           return <div key={i} className={`aspect-square rounded-sm ${cls}`} />;
         })}
@@ -113,20 +88,27 @@ export function ContentionPanel() {
         <span>
           committed{" "}
           <span className="text-accent">
-            {committed}/{writers.length || WRITERS}
+            {committed}/{writers}
           </span>
         </span>
         <span>
-          retries <span className="text-warn">{retries}</span>
+          real 40001 conflicts <span className="text-warn">{result?.conflicts ?? 0}</span>
         </span>
         <span>
-          conflict rate{" "}
-          <span className={conflictRate > 30 ? "text-warn" : "text-accent"}>{conflictRate}%</span>
+          chain forks{" "}
+          <span className={result?.forked ? "text-danger" : "text-accent"}>
+            {result?.forked ? "1+" : 0}
+          </span>
         </span>
+        <span>{result ? `${result.ms}ms` : ""}</span>
       </div>
+
+      {error && <p className="font-mono text-[10px] text-danger">{error}</p>}
       <p className="font-mono text-[10px] text-muted">
-        Random keys spread writes across the key range (near-zero conflict). A hot key forces 40001
-        conflicts that the retry wrapper resolves. The live contention test runs against DSQL.
+        Fires real concurrent appends against the live Aurora DSQL cluster. A hot key makes them
+        collide on the composite primary key, returning real SQLSTATE 40001 conflicts that the retry
+        wrapper resolves into one unforked chain. Random keys (hot key off) spread writes so they do
+        not conflict. Synthetic throwaway subjects.
       </p>
     </div>
   );
