@@ -28,6 +28,9 @@ export const SELECT_CONSENT_TIP =
 export const SELECT_CONSENT_PROJECTION =
   "SELECT current_status, last_seq, last_entry_hash FROM consent_status_projection WHERE user_id = $1";
 
+export const SELECT_CONSENT_EVENT_BY_IDEM =
+  "SELECT seq, entry_hash, event_type FROM consent_event WHERE idempotency_key = $1";
+
 export const INSERT_CONSENT_EVENT =
   "INSERT INTO consent_event (user_id, seq, event_type, payload, prev_hash, entry_hash, idempotency_key) " +
   "VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (idempotency_key) DO NOTHING";

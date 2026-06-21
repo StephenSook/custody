@@ -29,7 +29,7 @@ async function main(): Promise<void> {
     body: { actor: "parent" },
   });
 
-  await setCap(txn, { minorId: userId, capMinor: 2000n, idempotencyKey: randomUUID() });
+  await setCap(txn, { minorId: userId, capMinor: 2000n });
 
   const authorized = await recordSpend(txn, {
     minorId: userId,

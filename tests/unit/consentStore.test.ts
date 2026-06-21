@@ -32,18 +32,31 @@ describe("recordConsent", () => {
     expect(r.status).toBe("REVOKED");
   });
 
-  it("is a no-op on replay (insert affects 0 rows) and does not write the projection", async () => {
+  it("is a no-op on replay and returns the ORIGINAL event's data, not the re-plan", async () => {
     const { txn, calls } = fakeQuerier([
       ok([{ last_seq: "1", last_entry_hash: TIP_HASH }]), // tip
       ok([], 0), // INSERT -> 0 rows (idempotency conflict)
-      ok([{ current_status: "GRANTED", last_seq: "1", last_entry_hash: TIP_HASH }]), // re-read
+      ok([{ seq: "1", entry_hash: TIP_HASH, event_type: "GRANT" }]), // original event by idem key
     ]);
-    const r = await recordConsent(txn, { userId: USER, eventType: "GRANT", idempotencyKey: IDEM });
+    // Replay this time as REVOKE; the result must reflect the ORIGINAL GRANT, not REVOKE.
+    const r = await recordConsent(txn, { userId: USER, eventType: "REVOKE", idempotencyKey: IDEM });
     expect(r.applied).toBe(false);
     expect(r.status).toBe("GRANTED");
+    expect(r.seq).toBe(1);
     const projWrites = calls.filter((c) =>
       c.text.includes("INSERT INTO consent_status_projection"),
     );
     expect(projWrites.length).toBe(0);
+  });
+
+  it("throws on replay if the original event cannot be found (invariant violation)", async () => {
+    const { txn } = fakeQuerier([
+      ok([{ last_seq: "1", last_entry_hash: TIP_HASH }]),
+      ok([], 0), // INSERT -> 0 rows
+      ok([]), // event-by-idem -> none (must never happen when rowCount is 0)
+    ]);
+    await expect(
+      recordConsent(txn, { userId: USER, eventType: "GRANT", idempotencyKey: IDEM }),
+    ).rejects.toThrow();
   });
 });

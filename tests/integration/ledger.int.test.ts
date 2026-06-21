@@ -34,7 +34,7 @@ describe.skipIf(!LIVE)("ledger integration (live DSQL)", () => {
   it("enforces the cumulative spend cap", async () => {
     const txn = makeTxnRunner("east");
     const minorId = randomUUID();
-    await setCap(txn, { minorId, capMinor: 2000n, idempotencyKey: randomUUID() });
+    await setCap(txn, { minorId, capMinor: 2000n });
     const within = await recordSpend(txn, {
       minorId,
       amountMinor: 1500n,

@@ -1,8 +1,9 @@
+import { nextConsentStatus } from "@/src/domain/consent";
 import { planConsentAppend } from "@/src/domain/ledger";
 import type { ConsentEventType, ConsentStatus } from "@/src/domain/types";
 import {
   INSERT_CONSENT_EVENT,
-  SELECT_CONSENT_PROJECTION,
+  SELECT_CONSENT_EVENT_BY_IDEM,
   SELECT_CONSENT_TIP,
   type TxnRunner,
   UPSERT_CONSENT_PROJECTION,
@@ -49,13 +50,20 @@ export function recordConsent(txn: TxnRunner, input: RecordConsentInput): Promis
     ]);
 
     if (ins.rowCount === 0) {
-      const cur = await q.query(SELECT_CONSENT_PROJECTION, [input.userId]);
-      const row = cur.rows[0];
+      // Replay: the idempotency key already committed. Return the ORIGINAL event's data,
+      // not the freshly computed plan (which reflects the replaying caller's tip/input).
+      const existing = await q.query(SELECT_CONSENT_EVENT_BY_IDEM, [input.idempotencyKey]);
+      const evRow = existing.rows[0];
+      if (!evRow) {
+        throw new Error(
+          `consent replay: original event missing for idempotency key ${input.idempotencyKey}`,
+        );
+      }
       return {
         applied: false,
-        status: (row?.current_status as ConsentStatus | undefined) ?? plan.status,
-        seq: row ? Number(row.last_seq) : plan.seq,
-        entryHash: row ? String(row.last_entry_hash) : plan.entryHash,
+        status: nextConsentStatus(evRow.event_type as ConsentEventType),
+        seq: Number(evRow.seq),
+        entryHash: String(evRow.entry_hash),
       };
     }
 

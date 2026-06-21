@@ -9,7 +9,7 @@ const GEN = "0".repeat(64);
 describe("setCap", () => {
   it("upserts the cap projection with the genesis tip", async () => {
     const { txn, calls } = fakeQuerier([ok([], 1)]);
-    await setCap(txn, { minorId: MINOR, capMinor: 2000n, idempotencyKey: IDEM });
+    await setCap(txn, { minorId: MINOR, capMinor: 2000n });
     expect(calls[0]?.text).toContain("spend_total_projection");
     expect(calls[0]?.params).toEqual([MINOR, "2000", GEN]);
   });
@@ -85,5 +85,23 @@ describe("recordSpend", () => {
     expect(r.totalMinor).toBe(500n);
     const updates = calls.filter((c) => c.text.includes("UPDATE spend_total_projection"));
     expect(updates.length).toBe(0);
+  });
+
+  it("throws on replay if the original spend event cannot be found", async () => {
+    const { txn } = fakeQuerier([
+      ok([
+        { total_minor: "500", cap_minor: "2000", last_seq: "1", last_entry_hash: "a".repeat(64) },
+      ]),
+      ok([], 0), // INSERT -> 0 rows
+      ok([]), // event-by-idem -> none
+    ]);
+    await expect(
+      recordSpend(txn, {
+        minorId: MINOR,
+        amountMinor: 500n,
+        currency: "USD",
+        idempotencyKey: IDEM,
+      }),
+    ).rejects.toThrow();
   });
 });

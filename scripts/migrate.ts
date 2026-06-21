@@ -75,26 +75,32 @@ type RunQuery = (
   params?: unknown[],
 ) => Promise<{ rows: Array<Record<string, unknown>> }>;
 
-async function waitForAsyncIndexes(query: RunQuery): Promise<void> {
-  // CREATE INDEX ASYNC builds in the background. Verify the exact sys.jobs columns
-  // against the live cluster on day 0; this poll is best-effort and never hard-fails.
+type IndexWaitResult = "verified" | "unverified" | "timeout";
+
+async function waitForAsyncIndexes(query: RunQuery): Promise<IndexWaitResult> {
+  // CREATE INDEX ASYNC builds in the background. Verify the exact sys.jobs columns against
+  // the live cluster on day 0. Returns "verified" ONLY when it confirmed zero pending
+  // jobs, so a poll failure or unexpected shape never becomes a false green.
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     try {
       const res = await query(
         "SELECT count(*)::int AS pending FROM sys.jobs WHERE status <> 'completed'",
       );
-      const pending = Number(res.rows[0]?.pending ?? 0);
-      if (pending === 0) {
-        return;
+      const pending = res.rows[0]?.pending;
+      if (pending === undefined || pending === null) {
+        return "unverified";
+      }
+      if (Number(pending) === 0) {
+        return "verified";
       }
     } catch (err) {
       console.warn("could not poll sys.jobs (verify schema on day 0):", err);
-      return;
+      return "unverified";
     }
     await sleep(2000);
   }
-  console.warn("timed out waiting for async index jobs; they may still be building");
+  return "timeout";
 }
 
 async function main(): Promise<void> {
@@ -110,8 +116,17 @@ async function main(): Promise<void> {
     await query(ddl);
     console.log("index ok:", ddl.slice(0, 64).replace(/\s+/g, " "));
   }
-  await waitForAsyncIndexes(query);
-  console.log(`migration complete for region "${region}"`);
+  const indexStatus = await waitForAsyncIndexes(query);
+  if (indexStatus === "verified") {
+    console.log(`migration complete for region "${region}" (async indexes verified)`);
+  } else {
+    console.warn(
+      `WARNING: migration ran for region "${region}" but async index build is ${indexStatus}. ` +
+        "The UNIQUE idempotency indexes may not yet enforce uniqueness. Do not rely on " +
+        "idempotency for this region until confirmed against sys.jobs on the live cluster.",
+    );
+    process.exitCode = 1;
+  }
   await pool.end();
 }
 

@@ -12,7 +12,6 @@ import {
 export interface SetCapInputData {
   minorId: string;
   capMinor: bigint;
-  idempotencyKey: string;
 }
 
 /**
@@ -77,14 +76,22 @@ export function recordSpend(txn: TxnRunner, input: RecordSpendInputData): Promis
     ]);
 
     if (ins.rowCount === 0) {
-      const ev = await q.query(SELECT_SPEND_EVENT_BY_IDEM, [input.idempotencyKey]);
-      const evRow = ev.rows[0];
+      // Replay: return the ORIGINAL decision recorded under this idempotency key. The
+      // event must exist (rowCount 0 means the key is already present); a missing row is
+      // an invariant violation, not a silent decline.
+      const existing = await q.query(SELECT_SPEND_EVENT_BY_IDEM, [input.idempotencyKey]);
+      const evRow = existing.rows[0];
+      if (!evRow) {
+        throw new Error(
+          `spend replay: original event missing for idempotency key ${input.idempotencyKey}`,
+        );
+      }
       return {
         applied: false,
-        authorized: Boolean(evRow?.authorized),
-        totalMinor: tip.totalMinor,
-        seq: evRow ? Number(evRow.seq) : plan.seq,
-        entryHash: evRow ? String(evRow.entry_hash) : plan.entryHash,
+        authorized: Boolean(evRow.authorized),
+        totalMinor: tip.totalMinor, // current snapshot total for this minor
+        seq: Number(evRow.seq),
+        entryHash: String(evRow.entry_hash),
       };
     }
 
