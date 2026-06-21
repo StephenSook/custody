@@ -2,48 +2,63 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
-import {
-  type ChainEntry,
-  computeEntryHash,
-  GENESIS_PREV_HASH,
-  verifyChain,
-} from "@/src/crypto/hashChain";
+import { type ChainEntry, verifyChain } from "@/src/crypto/hashChain";
 
-// An illustrative chain so the verifier is interactive standalone. In the live demo the
-// entries come from the per-user DSQL hash chain; the verification algorithm is identical.
-const SEED_EVENTS: Record<string, unknown>[] = [
-  { eventType: "GRANT", seq: 1 },
-  { eventType: "SET_CAP", capMinor: "2000", seq: 2 },
-  { eventType: "SPEND", amountMinor: "500", authorized: true, seq: 3 },
-  { eventType: "SPEND", amountMinor: "1800", authorized: false, seq: 4 },
-  { eventType: "REVOKE", seq: 5 },
-];
-
-async function buildChain(payloads: Record<string, unknown>[]): Promise<ChainEntry[]> {
-  const entries: ChainEntry[] = [];
-  let prev = GENESIS_PREV_HASH;
-  for (let i = 0; i < payloads.length; i++) {
-    const payload = payloads[i] as Record<string, unknown>;
-    const entryHash = await computeEntryHash(payload, prev);
-    entries.push({ seq: i + 1, payload, prevHash: prev, entryHash });
-    prev = entryHash;
-  }
-  return entries;
+interface RawEntry {
+  seq: number;
+  payload: Record<string, unknown>;
+  prevHash: string;
+  entryHash: string;
 }
 
-export function HashChainLedger() {
+/**
+ * Verifies the REAL per-user consent hash chain fetched live from Aurora DSQL (via
+ * /api/ledger), not a client-side constant. Verify recomputes each entry's hash over the
+ * stored payload and prev_hash and compares to the stored entry_hash, so a judge can tamper a
+ * block and watch the chain break from the first altered index. The data is synthetic.
+ */
+export function HashChainLedger({
+  userId,
+  refreshKey = 0,
+}: {
+  userId: string;
+  refreshKey?: number;
+}) {
   const [entries, setEntries] = useState<ChainEntry[]>([]);
   const [brokenFrom, setBrokenFrom] = useState<number | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
-  const rebuild = useCallback(async () => {
-    setEntries(await buildChain(SEED_EVENTS));
+  const load = useCallback(async () => {
+    setStatus("loading");
     setBrokenFrom(null);
-  }, []);
+    try {
+      const res = await fetch(`/api/ledger?userId=${encodeURIComponent(userId)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        throw new Error(`ledger ${res.status}`);
+      }
+      const data = (await res.json()) as { entries: RawEntry[] };
+      setEntries(
+        data.entries.map((e) => ({
+          seq: e.seq,
+          payload: e.payload,
+          prevHash: e.prevHash,
+          entryHash: e.entryHash,
+        })),
+      );
+      setStatus("ready");
+    } catch (err) {
+      console.error("ledger load failed", err);
+      setStatus("error");
+    }
+  }, [userId]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey is an intentional refetch trigger (refetch the live chain after each commit)
   useEffect(() => {
-    void rebuild();
-  }, [rebuild]);
+    void load();
+  }, [load, refreshKey]);
 
   const verify = useCallback(async () => {
     setVerifying(true);
@@ -69,26 +84,36 @@ export function HashChainLedger() {
         <button
           type="button"
           onClick={() => void verify()}
-          disabled={verifying}
+          disabled={verifying || entries.length === 0}
           className="rounded-md border border-accent-soft px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-accent transition hover:bg-accent/10 disabled:opacity-50"
         >
           {verifying ? "verifying" : "verify chain"}
         </button>
         <button
           type="button"
-          onClick={() => void rebuild()}
+          onClick={() => void load()}
           className="rounded-md border border-border px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-muted transition hover:bg-surface-2"
         >
-          reset
+          reload
         </button>
         <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.2em]">
-          {brokenFrom === null ? (
+          {status === "loading" ? (
+            <span className="text-muted">loading live chain</span>
+          ) : status === "error" ? (
+            <span className="text-danger">could not load live chain</span>
+          ) : brokenFrom === null ? (
             <span className="text-accent">chain intact</span>
           ) : (
             <span className="text-danger">broken from #{brokenFrom + 1}</span>
           )}
         </span>
       </div>
+
+      {status === "ready" && entries.length === 0 ? (
+        <p className="font-mono text-[11px] text-muted">
+          no consent events yet. grant or revoke consent to append the first block.
+        </p>
+      ) : null}
 
       <div className="flex flex-col gap-2">
         <AnimatePresence initial={false}>
@@ -99,7 +124,7 @@ export function HashChainLedger() {
             );
             return (
               <motion.div
-                key={entry.entryHash}
+                key={`${entry.seq}-${entry.entryHash}`}
                 layout
                 initial={{ opacity: 0, x: 24, filter: "blur(8px)" }}
                 animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}

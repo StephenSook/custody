@@ -86,7 +86,7 @@ export function ControlRoom() {
         </Panel>
 
         <Panel title="Tamper-evident ledger" kicker="sha-256 hash chain" className="lg:col-span-3">
-          <HashChainLedger />
+          <HashChainLedger userId={DEMO_USER} refreshKey={latency.key} />
         </Panel>
 
         <Panel title="Concurrency" kicker="occ under contention" className="lg:col-span-3">

@@ -31,6 +31,11 @@ export const SELECT_CONSENT_PROJECTION =
 export const SELECT_CONSENT_EVENT_BY_IDEM =
   "SELECT seq, entry_hash, event_type FROM consent_event WHERE idempotency_key = $1";
 
+// The full per-user consent chain (the stored payload IS the exact body that was hashed, so a
+// client can recompute entry_hash = SHA256(canonicalJSON(payload) + prev_hash) and verify).
+export const SELECT_CONSENT_EVENTS =
+  "SELECT seq, payload, prev_hash, entry_hash FROM consent_event WHERE user_id = $1 ORDER BY seq";
+
 export const INSERT_CONSENT_EVENT =
   "INSERT INTO consent_event (user_id, seq, event_type, payload, prev_hash, entry_hash, idempotency_key) " +
   "VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (idempotency_key) DO NOTHING";
