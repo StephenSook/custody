@@ -37,8 +37,29 @@ function getLimiter(): Ratelimit | null {
   return limiter;
 }
 
-export async function assertWithinRateLimit(key: string): Promise<void> {
-  const active = getLimiter();
+export async function assertWithinRateLimit(
+  key: string,
+  opts: { failClosed?: boolean } = {},
+): Promise<void> {
+  const failClosed = opts.failClosed ?? true;
+  let active: Ratelimit | null;
+  try {
+    active = getLimiter();
+  } catch (err) {
+    // getLimiter throws only when the limiter is unconfigured in production. Mutations
+    // (failClosed) must not run unprotected, so the error propagates. Reads (failClosed:
+    // false) degrade to best-effort: rate-limiting a read is abuse-prevention, not the
+    // wipe-state defense, so a missing limiter backend must not take the read path down.
+    // This is an explicit, logged per-call choice, not a silent global disable.
+    if (failClosed) {
+      throw err;
+    }
+    console.warn(
+      "[rateLimit] limiter unavailable; allowing read best-effort:",
+      (err as Error).message,
+    );
+    return;
+  }
   if (!active) {
     return;
   }

@@ -34,7 +34,10 @@ export async function GET(
     req.headers.get("x-real-ip") ||
     "unknown";
   try {
-    await assertWithinRateLimit(`stream:${ip}`);
+    // Reads are best-effort rate-limited: enforce when a limiter is configured, but do not
+    // take the live read stream down in production if the limiter backend is absent. Mutations
+    // (the wipe-state risk) keep the default fail-closed behavior in their actions.
+    await assertWithinRateLimit(`stream:${ip}`, { failClosed: false });
   } catch {
     return new Response("rate limit exceeded", { status: 429 });
   }
