@@ -86,3 +86,18 @@ export function makeTxnRunner(region: Region): TxnRunner {
     },
   };
 }
+
+/**
+ * A read-only Querier backed by a regional pool (no transaction, no retry). DSQL does not
+ * conflict-check plain reads, so reads are never wrapped in withRetry. Used by the SSE
+ * streams and server-side snapshot reads.
+ */
+export function readQuerier(region: Region): Querier {
+  const pool = getPool(region);
+  return {
+    async query<R extends QueryRow = QueryRow>(text: string, params?: unknown[]) {
+      const res = await pool.query(text, params);
+      return { rows: res.rows as R[], rowCount: res.rowCount ?? 0 };
+    },
+  };
+}
