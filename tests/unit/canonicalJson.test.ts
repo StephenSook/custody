@@ -26,3 +26,36 @@ describe("canonicalJson", () => {
     expect(canonicalJson(null)).toBe("null");
   });
 });
+
+describe("canonicalJson money and representability (tamper-evidence guards)", () => {
+  it("serializes bigint as an exact decimal string (money is bigint minor units)", () => {
+    expect(canonicalJson(500n)).toBe('"500"');
+    expect(canonicalJson({ amountMinor: 500n })).toBe('{"amountMinor":"500"}');
+  });
+
+  it("keeps bigint distinct from a same-valued number so they never collide", () => {
+    expect(canonicalJson(5)).toBe("5");
+    expect(canonicalJson(5n)).toBe('"5"');
+    expect(canonicalJson(5)).not.toBe(canonicalJson(5n));
+  });
+
+  it("fails closed on undefined rather than dropping it (false-tamper-negative guard)", () => {
+    expect(() => canonicalJson(undefined)).toThrow();
+    expect(() => canonicalJson({ a: undefined, b: 1 })).toThrow();
+  });
+
+  it("fails closed on NaN rather than coercing to null", () => {
+    expect(() => canonicalJson(Number.NaN)).toThrow();
+    expect(() => canonicalJson({ x: Number.NaN })).toThrow();
+  });
+
+  it("fails closed on Infinity and -Infinity", () => {
+    expect(() => canonicalJson(Number.POSITIVE_INFINITY)).toThrow();
+    expect(() => canonicalJson(Number.NEGATIVE_INFINITY)).toThrow();
+  });
+
+  it("fails closed on functions and symbols", () => {
+    expect(() => canonicalJson(() => 1)).toThrow();
+    expect(() => canonicalJson(Symbol("x"))).toThrow();
+  });
+});

@@ -46,6 +46,16 @@ describe("computeEntryHash", () => {
     const b = await computeEntryHash({ type: "GRANT" }, "f".repeat(64));
     expect(a).not.toBe(b);
   });
+
+  it("hashes a payload that carries bigint money without throwing", async () => {
+    const h = await computeEntryHash({ amountMinor: 2000n, currency: "USD" }, GENESIS_PREV_HASH);
+    expect(h).toMatch(/^[0-9a-f]{64}$/);
+    const again = await computeEntryHash(
+      { currency: "USD", amountMinor: 2000n },
+      GENESIS_PREV_HASH,
+    );
+    expect(h).toBe(again);
+  });
 });
 
 describe("verifyChain", () => {

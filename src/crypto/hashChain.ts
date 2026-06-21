@@ -25,6 +25,10 @@ export async function computeEntryHash(payload: unknown, prevHash: string): Prom
  * Recompute the whole chain and report the first index that does not verify, either
  * because its stored hash does not match the recomputed hash, or because its prevHash
  * does not link to the previous entry (which also catches deletes and reorders).
+ *
+ * For a deletion, firstBrokenIndex points at the first surviving entry whose prevHash
+ * no longer links (the slot after the removed one), since the removed entry is gone.
+ * Fails closed: a sparse or holey array returns valid:false rather than skipping.
  */
 export async function verifyChain(
   entries: readonly ChainEntry[],
