@@ -49,7 +49,12 @@ export function ContentionPanel() {
             { sleep, maxRetries: 10, baseDelayMs: 8 },
           );
           return { attempts, committed: true };
-        } catch {
+        } catch (err) {
+          // An exhausted-retry OCC conflict legitimately means not committed. A non-OCC
+          // throw is a real defect, not expected contention, so do not hide it behind a red cell.
+          if (!(err instanceof Error) || (err as { code?: string }).code !== OCC_SQLSTATE) {
+            console.error("contention writer threw a non-OCC error", err);
+          }
           return { attempts, committed: false };
         }
       }),
