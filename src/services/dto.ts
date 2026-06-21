@@ -14,3 +14,10 @@ export interface SpendActionResult {
   seq: number;
   entryHash: string;
 }
+
+export interface AgeProofResult {
+  bracket: string;
+  dobDisclosed: boolean;
+  credentialHash: string;
+  disclosedClaims: string[];
+}
