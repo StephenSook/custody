@@ -1,1 +1,62 @@
 @import "tailwindcss";
+
+@theme {
+  --color-bg: oklch(0.15 0.012 250);
+  --color-surface: oklch(0.19 0.014 250);
+  --color-surface-2: oklch(0.23 0.016 250);
+  --color-border: oklch(0.31 0.015 250);
+  --color-fg: oklch(0.96 0.004 250);
+  --color-muted: oklch(0.66 0.02 250);
+  --color-accent: oklch(0.84 0.17 152);
+  --color-accent-soft: oklch(0.5 0.1 152);
+  --color-danger: oklch(0.66 0.21 25);
+  --color-warn: oklch(0.83 0.15 85);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  /* control-room atmosphere: a soft accent glow up top plus a faint engineering grid */
+  background-image:
+    radial-gradient(ellipse 70% 40% at 50% -8%, oklch(0.84 0.17 152 / 0.07), transparent 60%),
+    linear-gradient(to right, oklch(1 0 0 / 0.018) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(1 0 0 / 0.018) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    44px 44px,
+    44px 44px;
+  background-attachment: fixed;
+}
+
+/* arcade scanline overlay (restrained flourish) */
+.scanlines::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, oklch(0 0 0 / 0.035) 3px 4px);
+  mix-blend-mode: overlay;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
