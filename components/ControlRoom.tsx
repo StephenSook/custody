@@ -1,8 +1,10 @@
 "use client";
 
 import { ConsentControls } from "./ConsentControls";
+import { ContentionPanel } from "./ContentionPanel";
 import { HashChainLedger } from "./HashChainLedger";
 import { RegionPanel } from "./RegionPanel";
+import { SdJwtPanel } from "./SdJwtPanel";
 import { SpendCapMeter } from "./SpendCapMeter";
 import { TwoRegionLink } from "./TwoRegionLink";
 import { Panel } from "./ui";
@@ -63,6 +65,18 @@ export function ControlRoom() {
 
         <Panel title="Tamper-evident ledger" kicker="sha-256 hash chain" className="lg:col-span-3">
           <HashChainLedger />
+        </Panel>
+
+        <Panel title="Concurrency" kicker="occ under contention" className="lg:col-span-3">
+          <ContentionPanel />
+        </Panel>
+
+        <Panel
+          title="Age verification"
+          kicker="sd-jwt selective disclosure"
+          className="lg:col-span-3"
+        >
+          <SdJwtPanel />
         </Panel>
       </div>
     </div>
