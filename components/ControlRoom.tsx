@@ -1,14 +1,23 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { ConsentControls } from "./ConsentControls";
 import { ContentionPanel } from "./ContentionPanel";
 import { HashChainLedger } from "./HashChainLedger";
 import { RegionPanel } from "./RegionPanel";
 import { SdJwtPanel } from "./SdJwtPanel";
 import { SpendCapMeter } from "./SpendCapMeter";
-import { TwoRegionLink } from "./TwoRegionLink";
+import { Starfield } from "./Starfield";
 import { Panel } from "./ui";
 import { useRegionStream } from "./useRegionStream";
+
+// deck.gl + MapLibre are WebGL and must not server-render: load the map client-only.
+const RegionArcMap = dynamic(() => import("./RegionArcMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[340px] w-full rounded-lg border border-border bg-surface-2/40" />
+  ),
+});
 
 // The watched demo subject. In the live demo this is the seeded id; the data is synthetic
 // (no real minors). The consent controls act on it and the region streams observe it.
@@ -21,9 +30,13 @@ export function ControlRoom() {
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8">
+      <div className="aurora" aria-hidden />
+      <Starfield />
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-accent">Custody</p>
+          <p className="neon font-mono text-[11px] uppercase tracking-[0.35em] text-accent">
+            Custody
+          </p>
           <h1 className="mt-1 text-2xl font-medium tracking-tight text-fg sm:text-3xl">
             Consistency control room
           </h1>
@@ -39,11 +52,7 @@ export function ControlRoom() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Two-region link" kicker="strong consistency" className="lg:col-span-3">
-          <TwoRegionLink
-            east={{ label: "us-east-1", status: east.status }}
-            west={{ label: "us-east-2", status: west.status }}
-            lastLatencyMs={null}
-          />
+          <RegionArcMap east={east.status} west={west.status} lastLatencyMs={null} />
         </Panel>
 
         <Panel title="Region A" kicker="us-east-1">

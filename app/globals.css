@@ -52,6 +52,39 @@ body {
   mix-blend-mode: overlay;
 }
 
+/* galaxy aurora: a slow drifting glow behind the control room (GPU-only transform/opacity) */
+.aurora {
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 38% at 28% 26%, oklch(0.6 0.16 152 / 0.22), transparent 70%),
+    radial-gradient(42% 42% at 74% 64%, oklch(0.52 0.16 260 / 0.2), transparent 72%),
+    radial-gradient(30% 30% at 60% 12%, oklch(0.7 0.18 152 / 0.12), transparent 70%);
+  filter: blur(48px);
+  animation: aurora-drift 26s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
+@keyframes aurora-drift {
+  from {
+    transform: translate3d(-2.5%, -1.5%, 0) rotate(0deg);
+    opacity: 0.8;
+  }
+  to {
+    transform: translate3d(2.5%, 1.5%, 0) rotate(6deg);
+    opacity: 1;
+  }
+}
+
+/* neon glow on the accent (static glow; only transform is animated elsewhere) */
+.neon {
+  text-shadow:
+    0 0 6px oklch(0.84 0.17 152 / 0.55),
+    0 0 16px oklch(0.7 0.18 152 / 0.32);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
