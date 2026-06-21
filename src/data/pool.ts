@@ -93,10 +93,12 @@ export function makeTxnRunner(region: Region): TxnRunner {
  * streams and server-side snapshot reads.
  */
 export function readQuerier(region: Region): Querier {
-  const pool = getPool(region);
+  // getPool is resolved lazily inside query so a missing endpoint surfaces as a caught
+  // query error (an SSE "error" event on an open stream), not a synchronous throw that
+  // turns the whole route into a 500.
   return {
     async query<R extends QueryRow = QueryRow>(text: string, params?: unknown[]) {
-      const res = await pool.query(text, params);
+      const res = await getPool(region).query(text, params);
       return { rows: res.rows as R[], rowCount: res.rowCount ?? 0 };
     },
   };
