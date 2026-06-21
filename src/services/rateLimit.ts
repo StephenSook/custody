@@ -16,6 +16,16 @@ function getLimiter(): Ratelimit | null {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) {
+    // Fail closed in production: a missing limiter must not silently disable the named
+    // defense. In non-production, warn loudly so the gap is visible in logs.
+    const isProduction =
+      process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+    if (isProduction) {
+      throw new Error(
+        "rate limiter not configured in production (UPSTASH_REDIS_REST_URL / TOKEN missing).",
+      );
+    }
+    console.warn("[rateLimit] Upstash not configured; rate limiting is DISABLED (non-production).");
     limiter = null;
     return limiter;
   }
