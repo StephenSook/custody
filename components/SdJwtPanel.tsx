@@ -6,14 +6,19 @@ import type { AgeProofResult } from "@/src/services/dto";
 
 export function SdJwtPanel() {
   const [proof, setProof] = useState<AgeProofResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const prove = () => {
+    setError(null);
     startTransition(async () => {
       try {
         setProof(await proveAgeBracketAction());
-      } catch {
+      } catch (err) {
+        // The proof is a scored showpiece; surface failure, do not swallow it.
+        console.error("age-bracket proof failed", err);
         setProof(null);
+        setError(err instanceof Error ? err.message : "proof failed");
       }
     });
   };
@@ -52,7 +57,9 @@ export function SdJwtPanel() {
               </div>
             </dl>
           ) : (
-            <p className="mt-2 font-mono text-xs text-muted">run the proof</p>
+            <p className={`mt-2 font-mono text-xs ${error ? "text-danger" : "text-muted"}`}>
+              {error ? "proof failed, retry" : "run the proof"}
+            </p>
           )}
         </div>
       </div>
