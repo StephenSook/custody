@@ -7,6 +7,7 @@ import { ConsentControls } from "./ConsentControls";
 import { ContentionPanel } from "./ContentionPanel";
 import { HashChainLedger } from "./HashChainLedger";
 import { RegionPanel } from "./RegionPanel";
+import { RegulatoryPanel } from "./RegulatoryPanel";
 import { SdJwtPanel } from "./SdJwtPanel";
 import { SpendCapMeter } from "./SpendCapMeter";
 import { Starfield } from "./Starfield";
@@ -78,7 +79,12 @@ export function ControlRoom() {
           />
         </Panel>
 
-        <Panel title="Parent actions" kicker="server actions" className="lg:col-span-3">
+        <Panel
+          id="parent-actions"
+          title="Parent actions"
+          kicker="server actions"
+          className="lg:col-span-3"
+        >
           <ConsentControls
             userId={DEMO_USER}
             minorId={DEMO_MINOR}
@@ -90,7 +96,12 @@ export function ControlRoom() {
           <AuthorizePanel userId={DEMO_USER} minorId={DEMO_MINOR} />
         </Panel>
 
-        <Panel title="Tamper-evident ledger" kicker="sha-256 hash chain" className="lg:col-span-3">
+        <Panel
+          id="ledger"
+          title="Tamper-evident ledger"
+          kicker="sha-256 hash chain"
+          className="lg:col-span-3"
+        >
           <HashChainLedger userId={DEMO_USER} refreshKey={latency.key} />
         </Panel>
 
@@ -99,11 +110,21 @@ export function ControlRoom() {
         </Panel>
 
         <Panel
+          id="age-verification"
           title="Age verification"
           kicker="sd-jwt selective disclosure"
           className="lg:col-span-3"
         >
           <SdJwtPanel />
+        </Panel>
+
+        <Panel
+          id="compliance"
+          title="Compliance mapping"
+          kicker="supported regimes"
+          className="lg:col-span-3"
+        >
+          <RegulatoryPanel />
         </Panel>
       </div>
     </div>
