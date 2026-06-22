@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Custody · Architecture Graph</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #060810; overflow: hidden; font-family: 'Geist Mono', 'SF Mono', 'Fira Code', monospace; }
+
+  #header {
+    position: absolute; top: 20px; left: 24px; z-index: 10;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  #header h1 {
+    color: #4ade80; font-size: 18px; font-weight: 700; letter-spacing: 2px;
+    text-shadow: 0 0 20px rgba(74, 222, 128, 0.5);
+  }
+  #header p { color: #5b6472; font-size: 11px; letter-spacing: 1px; }
+
+  #legend {
+    position: absolute; bottom: 24px; left: 24px; z-index: 10;
+    background: rgba(8, 10, 18, 0.92); border: 1px solid #1f2733;
+    border-radius: 10px; padding: 16px 20px; backdrop-filter: blur(12px);
+  }
+  .legend-title {
+    color: #8b949e; font-size: 9px; font-weight: 700;
+    letter-spacing: 2px; margin-bottom: 10px; text-transform: uppercase;
+  }
+  .legend-item { display: flex; align-items: center; gap: 10px; margin: 6px 0; color: #c9d1d9; font-size: 11px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+  #info-panel {
+    position: absolute; bottom: 24px; right: 24px; z-index: 10;
+    background: rgba(8, 10, 18, 0.92); border: 1px solid #1f2733;
+    border-radius: 10px; padding: 16px 20px; backdrop-filter: blur(12px);
+    max-width: 380px; display: none; white-space: pre-wrap;
+  }
+  #info-panel .info-title { color: #4ade80; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  #info-panel .info-group { color: #5b6472; font-size: 10px; letter-spacing: 1.5px; margin-bottom: 8px; text-transform: uppercase; }
+  #info-panel .info-desc { color: #c9d1d9; font-size: 11px; line-height: 1.6; }
+
+  #controls {
+    position: absolute; top: 20px; right: 24px; z-index: 10;
+    display: flex; gap: 8px;
+  }
+  #controls button {
+    background: rgba(8, 10, 18, 0.85); border: 1px solid #1f2733;
+    color: #c9d1d9; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+    font-family: inherit; font-size: 11px; letter-spacing: 1px;
+    backdrop-filter: blur(8px); transition: all 0.2s;
+  }
+  #controls button:hover { border-color: #4ade80; color: #4ade80; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>CUSTODY &middot; ARCHITECTURE GRAPH</h1>
+  <p>FRONT TO BACK ON AURORA DSQL &middot; HOVER TO TRACE &middot; CLICK FOR DETAIL &middot; SYNTHETIC DATA</p>
+</div>
+
+<div id="controls">
+  <button id="btn-reset">RESET VIEW</button>
+  <button id="btn-spin">AUTO-ROTATE</button>
+</div>
+
+<div id="legend">
+  <div class="legend-title">System Layers</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#22d3ee; box-shadow:0 0 12px #22d3ee"></div>Showpiece</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4ade80; box-shadow:0 0 12px #4ade80"></div>Transport (Next.js on Vercel)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#60a5fa; box-shadow:0 0 12px #60a5fa"></div>Domain (pure logic)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#c084fc; box-shadow:0 0 12px #c084fc"></div>Crypto</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f472b6; box-shadow:0 0 12px #f472b6"></div>Data access</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fbbf24; box-shadow:0 0 12px #fbbf24"></div>Aurora DSQL</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fb7185; box-shadow:0 0 12px #fb7185"></div>Credential-free infra</div>
+</div>
+
+<div id="info-panel">
+  <div class="info-group" id="info-group"></div>
+  <div class="info-title" id="info-title"></div>
+  <div class="info-desc" id="info-desc"></div>
+</div>
+
+<div id="graph"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://esm.sh/three@0.181.0",
+    "three/": "https://esm.sh/three@0.181.0/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import ForceGraph3D from 'https://esm.sh/3d-force-graph@1.73.4?external=three';
+import SpriteText from 'https://esm.sh/three-spritetext?external=three';
+
+const COLORS = {
+  showpiece: '#22d3ee',
+  transport: '#4ade80',
+  domain:    '#60a5fa',
+  crypto:    '#c084fc',
+  data:      '#f472b6',
+  dsql:      '#fbbf24',
+  infra:     '#fb7185',
+};
+
+const GROUP_LABELS = {
+  showpiece: 'SHOWPIECE',
+  transport: 'TRANSPORT (NEXT.JS ON VERCEL)',
+  domain:    'DOMAIN (PURE LOGIC)',
+  crypto:    'CRYPTO',
+  data:      'DATA ACCESS',
+  dsql:      'AURORA DSQL',
+  infra:     'CREDENTIAL-FREE INFRA',
+};
+
+const nodes = [
+  // Showpieces
+  { id: 'two_region',     name: 'Two-region consistency', group: 'showpiece', val: 20, desc: 'The headline. Revoke in one region and both regions agree on commit.\nStrong consistency on commit, no vulnerable window.\nMeasured cross-region latency with a deck.gl arc.' },
+  { id: 'ledger_viz',     name: 'Tamper-evident ledger',  group: 'showpiece', val: 18, desc: 'Per-user SHA-256 hash chain rendered as blocks.\nVerify, tamper a block, watch it break from the first altered entry.\nExportable and verifiable offline.' },
+  { id: 'contention',     name: 'OCC contention',         group: 'showpiece', val: 16, desc: 'Fire concurrent writers at a hot key.\nReal SQLSTATE 40001 conflicts resolve into one unforked chain.' },
+  { id: 'sdjwt_viz',      name: 'SD-JWT age proof',       group: 'showpiece', val: 16, desc: 'Prove an age bracket without disclosing the date of birth.\nSelective disclosure, RFC 9901.' },
+
+  // Transport
+  { id: 'controlroom',    name: 'Control Room',           group: 'transport', val: 16, desc: 'Next.js 16 App Router UI on Vercel.\nServer Components by default, thin client islands.\nInstallable PWA.' },
+  { id: 'grant',          name: 'grantConsentAction',     group: 'transport', val: 11, desc: 'Server Action: append GRANT and update the projection in one OCC transaction.' },
+  { id: 'revoke',         name: 'revokeConsentAction',    group: 'transport', val: 12, desc: 'Server Action: append REVOKE, strongly consistent cross-region on commit.' },
+  { id: 'setcap',         name: 'setCapAction',           group: 'transport', val: 10, desc: 'Server Action: set the per-minor spending cap.' },
+  { id: 'recordspend',    name: 'recordSpendAction',      group: 'transport', val: 11, desc: 'Server Action: append a spend event and enforce the cap.' },
+  { id: 'api_ledger',     name: '/api/ledger',            group: 'transport', val: 11, desc: 'Route Handler: reads the real per-user hash chain from DSQL.' },
+  { id: 'api_authorize',  name: '/api/authorize',         group: 'transport', val: 13, desc: 'Route Handler: the platform gate. Identical allow or deny from any region.' },
+  { id: 'api_contention', name: '/api/contention-burst',  group: 'transport', val: 11, desc: 'Route Handler: fires real concurrent appends to force 40001 conflicts.' },
+  { id: 'api_stream',     name: '/api/stream/[region]',   group: 'transport', val: 14, desc: 'Per-region SSE. Streams the committed state so both panels flip on commit.' },
+  { id: 'age_action',     name: 'proveAgeBracketAction',  group: 'transport', val: 10, desc: 'Server Action: issues, presents, and verifies an SD-JWT.' },
+
+  // Domain
+  { id: 'consent_dom',    name: 'Consent rules',          group: 'domain', val: 12, desc: 'Pure logic: grant and revoke state, next chain entry.' },
+  { id: 'spend_dom',      name: 'Spend-cap rules',        group: 'domain', val: 12, desc: 'Pure logic: total against cap, decline at cap.' },
+  { id: 'authorize_dom',  name: 'Authorize',              group: 'domain', val: 13, desc: 'Pure decision: consent first, then cap. Reused by the gate.' },
+  { id: 'ledger_dom',     name: 'Ledger projection',      group: 'domain', val: 11, desc: 'Derives current status from the append-only event log.' },
+  { id: 'schemas',        name: 'Zod schemas',            group: 'domain', val: 11, desc: 'Validate every input at the transport boundary.' },
+
+  // Crypto
+  { id: 'hashchain',      name: 'SHA-256 hash chain',     group: 'crypto', val: 16, desc: 'entry_hash = SHA256(canonicalJSON(payload) + prev_hash).\nGenesis prev = 64 zeros. Verifies in the browser via Web Crypto.' },
+  { id: 'canonicaljson',  name: 'Canonical JSON',         group: 'crypto', val: 12, desc: 'RFC 8785 sorted-key canonicalization, bigint-safe, fail-closed.' },
+  { id: 'agecred',        name: 'SD-JWT credential',      group: 'crypto', val: 13, desc: 'RFC 9901 selective disclosure. Stores only an age bracket and a credential hash.' },
+
+  // Data access
+  { id: 'pool',           name: 'AuroraDSQLPool',         group: 'data', val: 16, desc: 'One client pool per regional endpoint. sslmode require, 45 to 55 min lifetime.' },
+  { id: 'withretry',      name: 'OCC withRetry',          group: 'data', val: 14, desc: 'Retries only SQLSTATE 40001 with exponential backoff and full jitter. Reads never retry.' },
+  { id: 'reads',          name: 'Region reads',           group: 'data', val: 11, desc: 'Read the strongly-consistent projections per region.' },
+  { id: 'consentstore',   name: 'Consent store',          group: 'data', val: 12, desc: 'Idempotent append plus projection in one withRetry transaction.' },
+  { id: 'spendstore',     name: 'Spend store',            group: 'data', val: 12, desc: 'Idempotent spend append plus projection, integer minor units.' },
+
+  // Aurora DSQL
+  { id: 'dsql',           name: 'Aurora DSQL',            group: 'dsql', val: 24, desc: 'Active-active multi-region, strong consistency on commit.\nNo SERIAL, no foreign keys, no triggers. CREATE INDEX ASYNC.' },
+  { id: 'consent_event',  name: 'consent_event',          group: 'dsql', val: 12, desc: 'Append-only. PK (user_id, seq) serializes the chain.' },
+  { id: 'spend_event',    name: 'spend_event',            group: 'dsql', val: 12, desc: 'Append-only. PK (minor_id, seq).' },
+  { id: 'proj',           name: 'Projections',            group: 'dsql', val: 12, desc: 'Per-entity current status and spend total. Never a global hot row.' },
+  { id: 'east',           name: 'us-east-1',              group: 'dsql', val: 12, desc: 'Primary regional endpoint.' },
+  { id: 'west',           name: 'us-east-2',              group: 'dsql', val: 12, desc: 'Peer regional endpoint.' },
+  { id: 'witness',        name: 'us-west-2 witness',      group: 'dsql', val: 10, desc: 'Quorum witness, no endpoint.' },
+
+  // Infra
+  { id: 'oidc',           name: 'Vercel OIDC',            group: 'infra', val: 13, desc: 'Vercel token to an AWS IAM role to a region-scoped DSQL token. No database password.' },
+  { id: 'upstash',        name: 'Upstash rate-limit',     group: 'infra', val: 10, desc: 'Fail-closed on mutations, best-effort on reads.' },
+];
+
+const links = [
+  // UI hosts showpieces + triggers actions
+  { source: 'controlroom', target: 'two_region' },
+  { source: 'controlroom', target: 'ledger_viz' },
+  { source: 'controlroom', target: 'contention' },
+  { source: 'controlroom', target: 'sdjwt_viz' },
+  { source: 'controlroom', target: 'grant' },
+  { source: 'controlroom', target: 'revoke' },
+  { source: 'controlroom', target: 'setcap' },
+  { source: 'controlroom', target: 'recordspend' },
+
+  // Showpieces to their endpoints
+  { source: 'two_region', target: 'api_stream' },
+  { source: 'two_region', target: 'revoke' },
+  { source: 'ledger_viz', target: 'api_ledger' },
+  { source: 'ledger_viz', target: 'hashchain' },
+  { source: 'contention', target: 'api_contention' },
+  { source: 'sdjwt_viz',  target: 'age_action' },
+
+  // Actions to domain + data
+  { source: 'grant',       target: 'consent_dom' },
+  { source: 'grant',       target: 'consentstore' },
+  { source: 'grant',       target: 'schemas' },
+  { source: 'revoke',      target: 'consent_dom' },
+  { source: 'revoke',      target: 'consentstore' },
+  { source: 'setcap',      target: 'spend_dom' },
+  { source: 'setcap',      target: 'spendstore' },
+  { source: 'recordspend', target: 'spend_dom' },
+  { source: 'recordspend', target: 'spendstore' },
+  { source: 'recordspend', target: 'schemas' },
+  { source: 'api_authorize', target: 'authorize_dom' },
+  { source: 'api_authorize', target: 'reads' },
+  { source: 'api_authorize', target: 'upstash' },
+  { source: 'api_ledger',    target: 'reads' },
+  { source: 'api_stream',    target: 'reads' },
+  { source: 'api_contention', target: 'consentstore' },
+  { source: 'age_action',    target: 'agecred' },
+
+  // Domain composition
+  { source: 'authorize_dom', target: 'consent_dom' },
+  { source: 'authorize_dom', target: 'spend_dom' },
+  { source: 'consent_dom',   target: 'ledger_dom' },
+
+  // Crypto usage
+  { source: 'consentstore', target: 'hashchain' },
+  { source: 'spendstore',   target: 'hashchain' },
+  { source: 'hashchain',    target: 'canonicaljson' },
+  { source: 'agecred',      target: 'canonicaljson' },
+
+  // Data to DSQL
+  { source: 'consentstore', target: 'withretry' },
+  { source: 'spendstore',   target: 'withretry' },
+  { source: 'consentstore', target: 'pool' },
+  { source: 'spendstore',   target: 'pool' },
+  { source: 'reads',        target: 'pool' },
+  { source: 'consentstore', target: 'consent_event' },
+  { source: 'spendstore',   target: 'spend_event' },
+  { source: 'consentstore', target: 'proj' },
+  { source: 'spendstore',   target: 'proj' },
+  { source: 'reads',        target: 'proj' },
+  { source: 'pool',         target: 'dsql' },
+
+  // DSQL internals
+  { source: 'dsql', target: 'consent_event' },
+  { source: 'dsql', target: 'spend_event' },
+  { source: 'dsql', target: 'proj' },
+  { source: 'dsql', target: 'east' },
+  { source: 'dsql', target: 'west' },
+  { source: 'dsql', target: 'witness' },
+
+  // Credential-free infra
+  { source: 'oidc', target: 'pool' },
+  { source: 'revoke', target: 'upstash' },
+];
+
+// Pre-compute neighbors for hover highlighting
+nodes.forEach(n => { n.neighbors = []; n.links = []; });
+links.forEach(link => {
+  const a = nodes.find(n => n.id === link.source);
+  const b = nodes.find(n => n.id === link.target);
+  if (a && b) {
+    a.neighbors.push(b);
+    b.neighbors.push(a);
+    a.links.push(link);
+    b.links.push(link);
+  }
+});
+
+const highlightNodes = new Set();
+const highlightLinks = new Set();
+let hoverNode = null;
+
+function getSourceNode(link) {
+  const sid = typeof link.source === 'object' ? link.source.id : link.source;
+  return nodes.find(n => n.id === sid);
+}
+
+const graphEl = document.getElementById('graph');
+let spinning = true;
+
+const Graph = ForceGraph3D()(graphEl)
+  .graphData({ nodes, links })
+  .backgroundColor('#060810')
+  .width(window.innerWidth)
+  .height(window.innerHeight)
+  .showNavInfo(false)
+
+  .nodeColor(node => {
+    if (highlightNodes.size === 0) return COLORS[node.group];
+    return highlightNodes.has(node) ? COLORS[node.group] : COLORS[node.group] + '30';
+  })
+  .nodeVal(n => n.val)
+  .nodeRelSize(5)
+  .nodeOpacity(0.9)
+  .nodeResolution(24)
+
+  .nodeThreeObject(node => {
+    const sprite = new SpriteText(node.name);
+    sprite.color = COLORS[node.group];
+    sprite.backgroundColor = 'rgba(6, 8, 16, 0.65)';
+    sprite.padding = 1.5;
+    sprite.borderRadius = 2;
+    sprite.textHeight = 2.5;
+    sprite.material.depthWrite = false;
+    sprite.position.y = 10;
+    return sprite;
+  })
+  .nodeThreeObjectExtend(true)
+
+  .nodeLabel(n =>
+    `<div style="color:${COLORS[n.group]};background:rgba(6,8,16,0.9);padding:6px 12px;border-radius:6px;font-family:'Geist Mono',monospace;font-size:11px;border:1px solid ${COLORS[n.group]}44;max-width:300px;line-height:1.5">${n.desc.split('\n')[0]}</div>`
+  )
+
+  .linkColor(link => {
+    const sn = getSourceNode(link);
+    const base = sn ? COLORS[sn.group] : '#ffffff';
+    if (highlightLinks.size === 0) return base + '44';
+    return highlightLinks.has(link) ? base + 'cc' : base + '12';
+  })
+  .linkWidth(link => highlightLinks.has(link) ? 2.5 : 0.6)
+  .linkOpacity(0.3)
+  .linkDirectionalParticles(link => highlightLinks.has(link) ? 6 : 2)
+  .linkDirectionalParticleWidth(link => highlightLinks.has(link) ? 3 : 1.5)
+  .linkDirectionalParticleSpeed(0.005)
+  .linkDirectionalParticleColor(link => {
+    const sn = getSourceNode(link);
+    return sn ? COLORS[sn.group] : '#ffffff';
+  })
+  .linkDirectionalArrowLength(5)
+  .linkDirectionalArrowRelPos(1)
+  .linkDirectionalArrowColor(link => {
+    const sn = getSourceNode(link);
+    return sn ? COLORS[sn.group] + '88' : '#ffffff88';
+  })
+  .linkCurvature(0.15)
+
+  .onNodeHover(node => {
+    if ((!node && !highlightNodes.size) || (node && hoverNode === node)) return;
+    highlightNodes.clear();
+    highlightLinks.clear();
+    if (node) {
+      highlightNodes.add(node);
+      node.neighbors.forEach(n => highlightNodes.add(n));
+      node.links.forEach(l => highlightLinks.add(l));
+    }
+    hoverNode = node || null;
+    updateHighlight();
+    graphEl.style.cursor = node ? 'pointer' : 'default';
+  })
+
+  .onNodeClick(node => {
+    document.getElementById('info-group').textContent = GROUP_LABELS[node.group] || '';
+    document.getElementById('info-title').textContent = node.name;
+    document.getElementById('info-desc').textContent = node.desc;
+    document.getElementById('info-panel').style.display = 'block';
+
+    const dist = 100;
+    const ratio = 1 + dist / Math.hypot(node.x, node.y, node.z);
+    Graph.cameraPosition(
+      { x: node.x * ratio, y: node.y * ratio, z: node.z * ratio },
+      node, 1500
+    );
+  })
+  .onBackgroundClick(() => {
+    document.getElementById('info-panel').style.display = 'none';
+    highlightNodes.clear();
+    highlightLinks.clear();
+    hoverNode = null;
+    updateHighlight();
+  });
+
+function updateHighlight() {
+  Graph
+    .nodeColor(Graph.nodeColor())
+    .linkColor(Graph.linkColor())
+    .linkWidth(Graph.linkWidth())
+    .linkDirectionalParticles(Graph.linkDirectionalParticles())
+    .linkDirectionalParticleWidth(Graph.linkDirectionalParticleWidth());
+}
+
+Graph.d3Force('charge').strength(-260);
+Graph.d3Force('link').distance(72);
+
+try {
+  const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    2.4,
+    0.85,
+    0
+  );
+  Graph.postProcessingComposer().addPass(bloomPass);
+} catch (e) {
+  console.warn('Bloom unavailable:', e);
+}
+
+const starGeometry = new THREE.BufferGeometry();
+const starPositions = new Float32Array(5000 * 3);
+for (let i = 0; i < 5000 * 3; i++) {
+  starPositions[i] = (Math.random() - 0.5) * 10000;
+}
+starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+Graph.scene().add(new THREE.Points(starGeometry, new THREE.PointsMaterial({
+  color: 0xffffff, size: 0.5, transparent: true, opacity: 0.4,
+})));
+
+Graph.scene().fog = new THREE.FogExp2(0x060810, 0.00025);
+
+setTimeout(() => {
+  Graph.cameraPosition({ x: 0, y: 0, z: 420 }, { x: 0, y: 0, z: 0 }, 2000);
+}, 300);
+
+function spin() {
+  if (!spinning) return;
+  const t = Date.now() * 0.00008;
+  Graph.cameraPosition({
+    x: 420 * Math.sin(t),
+    y: 80 * Math.sin(t * 0.6),
+    z: 420 * Math.cos(t),
+  });
+  requestAnimationFrame(spin);
+}
+spin();
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  Graph.cameraPosition({ x: 0, y: 0, z: 420 }, { x: 0, y: 0, z: 0 }, 1500);
+  document.getElementById('info-panel').style.display = 'none';
+  highlightNodes.clear();
+  highlightLinks.clear();
+  hoverNode = null;
+  updateHighlight();
+});
+
+document.getElementById('btn-spin').addEventListener('click', () => {
+  spinning = !spinning;
+  if (spinning) spin();
+});
+
+window.addEventListener('resize', () => {
+  Graph.width(window.innerWidth).height(window.innerHeight);
+});
+</script>
+</body>
+</html>

@@ -20,6 +20,16 @@ Built for the H0 hackathon (Hack the Zero Stack with Vercel v0 and AWS Databases
 
 > Grant or revoke consent on the live app and both region panels reflect the committed state. The us-east-2 panel reads the second regional endpoint, so what you see is real cross-region consistency, not a local animation.
 
+## Visualizations
+
+**Interactive 3D architecture graph.** A live, navigable map of the system from front to back: [custody-zeta.vercel.app/graph.html](https://custody-zeta.vercel.app/graph.html). Hover a node to trace its connections, click for detail. The graph is the real layering: transport, domain, crypto, data access, Aurora DSQL, and the credential-free infra.
+
+**Commit history.** A Gource time-lapse of the build, sixty commits over a day:
+
+![Custody commit history, rendered with Gource](docs/gource-preview.gif)
+
+Full-resolution video: [docs/gource.mp4](docs/gource.mp4).
+
 ## The problem
 
 When a parent revokes consent or hits a spend cap on a global platform, the decision often does not take effect everywhere at once. The child can keep playing, or keep spending, in another region while the systems reconcile, and the platform holds no verifiable proof of when the parent acted. Custody closes that window.
