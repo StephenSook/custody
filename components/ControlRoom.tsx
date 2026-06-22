@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import { AuthorizePanel } from "./AuthorizePanel";
 import { ConsentControls } from "./ConsentControls";
 import { ContentionPanel } from "./ContentionPanel";
 import { HashChainLedger } from "./HashChainLedger";
@@ -83,6 +84,10 @@ export function ControlRoom() {
             minorId={DEMO_MINOR}
             onLatency={(ms) => setLatency((p) => ({ ms, key: p.key + 1 }))}
           />
+        </Panel>
+
+        <Panel title="Platform gate" kicker="reference integration" className="lg:col-span-3">
+          <AuthorizePanel userId={DEMO_USER} minorId={DEMO_MINOR} />
         </Panel>
 
         <Panel title="Tamper-evident ledger" kicker="sha-256 hash chain" className="lg:col-span-3">

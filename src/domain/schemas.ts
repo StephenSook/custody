@@ -40,7 +40,22 @@ export const recordSpendInput = z.object({
   idempotencyKey,
 });
 
+// The platform-facing gate check (read-only). A platform asks: may this minor play, or spend
+// this amount, right now. amountMinor defaults to 0 (a play check).
+export const authorizeInput = z.object({
+  userId: uuid,
+  minorId: uuid,
+  action: z.enum(["play", "spend"]),
+  amountMinor: z
+    .number()
+    .int()
+    .nonnegative()
+    .transform((n) => BigInt(n))
+    .optional(),
+});
+
 export type GrantConsentInput = z.infer<typeof grantConsentInput>;
 export type RevokeConsentInput = z.infer<typeof revokeConsentInput>;
 export type SetCapInput = z.infer<typeof setCapInput>;
 export type RecordSpendInput = z.infer<typeof recordSpendInput>;
+export type AuthorizeInput = z.infer<typeof authorizeInput>;
