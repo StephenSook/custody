@@ -16,7 +16,7 @@ export function Panel({
   return (
     <section
       id={id}
-      className={`scroll-mt-24 rounded-xl border border-border bg-surface/60 shadow-[0_1px_0_oklch(1_0_0/0.03)_inset] backdrop-blur-sm ${className}`}
+      className={`min-w-0 scroll-mt-24 rounded-xl border border-border bg-surface/60 shadow-[0_1px_0_oklch(1_0_0/0.03)_inset] backdrop-blur-sm ${className}`}
     >
       {(title || kicker) && (
         <header className="flex items-baseline justify-between border-b border-border px-4 py-3">
