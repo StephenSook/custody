@@ -15,6 +15,7 @@ Built for the H0 hackathon (Hack the Zero Stack with Vercel v0 and AWS Databases
 ## Live demo
 
 - **App:** [custody-zeta.vercel.app](https://custody-zeta.vercel.app) (Vercel production, on a real two-region Aurora DSQL cluster)
+- **3D architecture graph:** [custody-zeta.vercel.app/graph.html](https://custody-zeta.vercel.app/graph.html) (live, interactive, hover to trace the layers)
 - **Video:** walkthrough link added at submission
 - **The four showpieces:** the two-region link with a commit-latency timer, the hash-chain tamper-and-verify, the OCC contention panel with a deliberate hot-key retry, and the SD-JWT age-bracket proof
 
