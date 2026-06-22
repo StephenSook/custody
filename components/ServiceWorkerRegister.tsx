@@ -17,7 +17,13 @@ export function ServiceWorkerRegister() {
         .register("/sw.js", { updateViaCache: "none" })
         .catch((err) => console.error("service worker registration failed", err));
     };
-    window.addEventListener("load", onLoad);
+    // If the window already finished loading before this effect ran (common with hydration),
+    // register immediately; otherwise wait for load so registration never gets missed.
+    if (document.readyState === "complete") {
+      onLoad();
+    } else {
+      window.addEventListener("load", onLoad);
+    }
     return () => window.removeEventListener("load", onLoad);
   }, []);
 

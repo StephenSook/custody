@@ -4,7 +4,13 @@
 const VERSION = "custody-v1";
 const STATIC_CACHE = VERSION + "-static";
 const OFFLINE_URL = "/offline.html";
-const PRECACHE = [OFFLINE_URL, "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
+const PRECACHE = [
+  OFFLINE_URL,
+  "/icon.svg",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -44,24 +50,24 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Immutable, content-hashed static assets: cache-first with a background refresh.
-  if (
-    url.pathname.startsWith("/_next/static/") ||
-    /\.(?:png|svg|woff2?|ico|css|js)$/.test(url.pathname)
-  ) {
+  // Immutable, content-hashed build assets ONLY: cache-first. Restricting to /_next/static/
+  // means a hashless asset (sw.js, public files) is never served stale from cache while online.
+  if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(
       caches.open(STATIC_CACHE).then(async (cache) => {
         const cached = await cache.match(req);
-        const network = fetch(req)
-          .then((res) => {
-            if (res && res.status === 200) cache.put(req, res.clone());
-            return res;
-          })
-          .catch(() => cached);
-        return cached || network;
+        if (cached) return cached;
+        const res = await fetch(req);
+        if (res && res.status === 200) cache.put(req, res.clone());
+        return res;
       }),
     );
+    return;
   }
+
+  // Precached icons and the offline page: serve from cache when present, otherwise network.
+  // Nothing reaching here is dynamic (live /api is handled above), so this is safe.
+  event.respondWith(caches.match(req).then((cached) => cached || fetch(req)));
 });
 
 // Let the page tell a waiting worker to take over immediately.
