@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { z } from "zod";
 import { type Region, readQuerier } from "@/src/data/pool";
 import { getConsentSnapshot, getSpendSnapshot } from "@/src/data/reads";
 import { assertWithinRateLimit } from "@/src/services/rateLimit";
@@ -42,8 +43,17 @@ export async function GET(
     return new Response("rate limit exceeded", { status: 429 });
   }
 
-  const userId = req.nextUrl.searchParams.get("userId");
-  const minorId = req.nextUrl.searchParams.get("minorId");
+  // A present-but-malformed id returns a clean 400 upfront; absent is allowed (that side just
+  // streams null). Demo seam: synthetic subject from the query string; in production derive it
+  // from the caller's session and a custody check.
+  const uuidOrNull = z.uuid().nullable();
+  const userIdParsed = uuidOrNull.safeParse(req.nextUrl.searchParams.get("userId"));
+  const minorIdParsed = uuidOrNull.safeParse(req.nextUrl.searchParams.get("minorId"));
+  if (!userIdParsed.success || !minorIdParsed.success) {
+    return new Response("userId and minorId must be valid uuids", { status: 400 });
+  }
+  const userId = userIdParsed.data;
+  const minorId = minorIdParsed.data;
   const querier = readQuerier(region as Region);
   const encoder = new TextEncoder();
 

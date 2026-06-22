@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import { DEMO_SUBJECT_ID } from "@/src/demoSubject";
 import { AuthorizePanel } from "./AuthorizePanel";
 import { ConsentControls } from "./ConsentControls";
 import { ContentionPanel } from "./ContentionPanel";
@@ -22,9 +23,10 @@ const RegionArcMap = dynamic(() => import("./RegionArcMap"), {
   ),
 });
 
-// The watched demo subject. In the live demo this is the seeded id; the data is synthetic
-// (no real minors). The consent controls act on it and the region streams observe it.
-const DEMO_USER = "00000000-0000-4000-8000-000000000abc";
+// The watched demo subject (the seeded synthetic id; no real minors). The consent controls
+// act on it and the region streams observe it. Shared with the seed so a fresh seed populates
+// exactly what the UI reads.
+const DEMO_USER = DEMO_SUBJECT_ID;
 const DEMO_MINOR = DEMO_USER;
 
 export function ControlRoom() {

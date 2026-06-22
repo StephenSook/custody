@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { z } from "zod";
 import { readQuerier } from "@/src/data/pool";
 import { SELECT_CONSENT_EVENTS } from "@/src/data/sql";
 import { assertWithinRateLimit } from "@/src/services/rateLimit";
@@ -26,9 +27,12 @@ export async function GET(req: NextRequest): Promise<Response> {
     return new Response("rate limit exceeded", { status: 429 });
   }
 
-  const userId = req.nextUrl.searchParams.get("userId");
-  if (!userId) {
-    return new Response(JSON.stringify({ error: "userId required" }), {
+  // Validate the subject is a UUID so a malformed id returns a clean 400 instead of falling
+  // through to the DB and erroring as a 500. (Demo seam: synthetic subject from the query
+  // string; in production derive it from the caller's session and a custody check.)
+  const userId = z.uuid().safeParse(req.nextUrl.searchParams.get("userId"));
+  if (!userId.success) {
+    return new Response(JSON.stringify({ error: "a valid userId (uuid) is required" }), {
       status: 400,
       headers: { "content-type": "application/json" },
     });
@@ -40,7 +44,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       payload: Record<string, unknown>;
       prev_hash: string;
       entry_hash: string;
-    }>(SELECT_CONSENT_EVENTS, [userId]);
+    }>(SELECT_CONSENT_EVENTS, [userId.data]);
     const entries = res.rows.map((r) => ({
       seq: Number(r.seq),
       payload: r.payload,

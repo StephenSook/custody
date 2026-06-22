@@ -19,8 +19,13 @@ import { getPool } from "@/src/data/pool";
  */
 
 const DB_ROLE = "custody_app";
-const IAM_ROLE_ARN =
-  process.env.RUNTIME_ROLE_ARN ?? "arn:aws:iam::741030561008:role/custody-vercel-oidc";
+// Required, no hardcoded fallback: a public repo must not pin a real AWS account id.
+const IAM_ROLE_ARN = process.env.RUNTIME_ROLE_ARN;
+if (!IAM_ROLE_ARN) {
+  throw new Error(
+    "RUNTIME_ROLE_ARN is required (e.g. arn:aws:iam::<ACCOUNT_ID>:role/custody-vercel-oidc)",
+  );
+}
 const TABLES = [
   "consent_event",
   "spend_event",

@@ -24,12 +24,17 @@ export async function POST(req: NextRequest): Promise<Response> {
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     req.headers.get("x-real-ip") ||
     "unknown";
+  // Mutation route: fail closed if the limiter is unavailable (429), then require the demo
+  // actor (403). Kept separate so an auth failure is not mislabeled as a rate-limit error.
   try {
-    // A mutation route: fail closed if the limiter is unavailable, and require the demo actor.
     await assertWithinRateLimit(`contention:${ip}`);
+  } catch {
+    return json({ error: "rate limit exceeded" }, 429);
+  }
+  try {
     requireActor();
   } catch {
-    return json({ error: "unavailable" }, 429);
+    return json({ error: "forbidden" }, 403);
   }
 
   const mode = req.nextUrl.searchParams.get("mode") === "spread" ? "spread" : "hot";

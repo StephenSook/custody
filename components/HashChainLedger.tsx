@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
-import { type ChainEntry, verifyChain } from "@/src/crypto/hashChain";
+import { type ChainEntry, GENESIS_PREV_HASH, verifyChain } from "@/src/crypto/hashChain";
 
 interface RawEntry {
   seq: number;
@@ -84,7 +84,7 @@ export function HashChainLedger({
       subject: userId,
       algorithm:
         "entry_hash = SHA-256(canonicalJSON(payload) + prev_hash), hex; genesis prev = 64 zeros",
-      genesis: "0".repeat(64),
+      genesis: GENESIS_PREV_HASH,
       entries: entries.map((e) => ({
         seq: e.seq,
         payload: e.payload,
