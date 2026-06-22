@@ -1,0 +1,6 @@
+.git
+node_modules
+.next
+_private
+docs
+.env.dsql
