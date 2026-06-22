@@ -9,6 +9,12 @@ import { z } from "zod";
 const uuid = z.uuid();
 const idempotencyKey = z.uuid();
 
+// Bound money well below Number.MAX_SAFE_INTEGER so an integer JSON number never loses
+// precision before the BigInt conversion. One trillion minor units is a generous ceiling for
+// a parental cap or a single spend, and is ~four orders of magnitude under the safe limit.
+const MAX_MINOR = 1_000_000_000_000;
+const minorUnits = z.number().int().max(MAX_MINOR);
+
 export const grantConsentInput = z.object({
   userId: uuid,
   idempotencyKey,
@@ -21,21 +27,13 @@ export const revokeConsentInput = z.object({
 
 export const setCapInput = z.object({
   minorId: uuid,
-  capMinor: z
-    .number()
-    .int()
-    .nonnegative()
-    .transform((n) => BigInt(n)),
+  capMinor: minorUnits.nonnegative().transform((n) => BigInt(n)),
   idempotencyKey,
 });
 
 export const recordSpendInput = z.object({
   minorId: uuid,
-  amountMinor: z
-    .number()
-    .int()
-    .positive()
-    .transform((n) => BigInt(n)),
+  amountMinor: minorUnits.positive().transform((n) => BigInt(n)),
   currency: z.string().regex(/^[A-Z]{3}$/, "currency must be a 3-letter ISO code"),
   idempotencyKey,
 });
@@ -46,9 +44,7 @@ export const authorizeInput = z.object({
   userId: uuid,
   minorId: uuid,
   action: z.enum(["play", "spend"]),
-  amountMinor: z
-    .number()
-    .int()
+  amountMinor: minorUnits
     .nonnegative()
     .transform((n) => BigInt(n))
     .optional(),

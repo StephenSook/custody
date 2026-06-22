@@ -16,8 +16,11 @@ export interface SetCapInputData {
 
 /**
  * Set or update a minor's spend cap. The projection row is created with total 0 and the
- * genesis tip if it does not exist; otherwise only the cap is updated. Setting a cap is
- * naturally idempotent (last write wins to the same value).
+ * genesis tip if it does not exist; otherwise only the cap is updated. This is an upsert, so
+ * it is naturally idempotent for the realistic retry (a re-sent identical request is a no-op
+ * to the same value). The mutation carries an idempotency key for a uniform API, but the cap
+ * upsert does not need it: there is no per-key dedupe row, so a deliberate same-key replay
+ * with a different value would re-set the cap. That is a client-contract misuse, not a retry.
  */
 export function setCap(txn: TxnRunner, input: SetCapInputData): Promise<void> {
   return txn.run(async (q) => {

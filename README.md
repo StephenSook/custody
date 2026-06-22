@@ -59,7 +59,7 @@ We would rather you check than take our word.
 | Credential-free auth | **WIRED LIVE** | Vercel OIDC federates to an AWS IAM role to a region-scoped DSQL token. No database password exists anywhere. |
 | Data | **SYNTHETIC** | synthetic operational data only: no real minors, no biometrics, no personal data. |
 
-The correctness core is built test-first: 88 tests (83 unit, 5 live-DSQL integration including a cross-region read-after-commit and an eight-way concurrent-append chain-integrity check).
+The correctness core is built test-first: a unit suite over the hash chain, the OCC retry wrapper, idempotency, and the consent, spend-cap, and authorize logic, plus a live-DSQL integration suite (a cross-region read-after-commit and an eight-way concurrent-append chain-integrity check). Counts are reported by CI rather than pinned here so they never drift.
 
 ## Architecture
 
