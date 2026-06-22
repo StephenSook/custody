@@ -1,0 +1,39 @@
+name: e2e
+
+# Manual only. The happy-path E2E runs against the DEPLOYED app on real Aurora DSQL (it cannot
+# run against a local server without cluster credentials), and it mutates the demo subject
+# (revoke then grant), so it is not gated on every push. Run it pre-submission or after a deploy.
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Deployment URL to test"
+        required: false
+        default: "https://custody-zeta.vercel.app"
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run happy-path E2E against the deployment
+        run: pnpm test:e2e
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://custody-zeta.vercel.app' }}
+          CI: "true"
