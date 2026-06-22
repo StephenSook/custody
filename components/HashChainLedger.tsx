@@ -78,9 +78,32 @@ export function HashChainLedger({
     setBrokenFrom(null);
   }, []);
 
+  const exportChain = useCallback(() => {
+    const data = {
+      product: "custody",
+      subject: userId,
+      algorithm:
+        "entry_hash = SHA-256(canonicalJSON(payload) + prev_hash), hex; genesis prev = 64 zeros",
+      genesis: "0".repeat(64),
+      entries: entries.map((e) => ({
+        seq: e.seq,
+        payload: e.payload,
+        prevHash: e.prevHash,
+        entryHash: e.entryHash,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `custody-audit-${userId.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [entries, userId]);
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => void verify()}
@@ -96,6 +119,22 @@ export function HashChainLedger({
         >
           reload
         </button>
+        <button
+          type="button"
+          onClick={exportChain}
+          disabled={entries.length === 0}
+          className="rounded-md border border-border px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-muted transition hover:bg-surface-2 disabled:opacity-50"
+        >
+          export
+        </button>
+        <a
+          href="/verify.html"
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-md border border-border px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-muted transition hover:bg-surface-2"
+        >
+          verify offline
+        </a>
         <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.2em]">
           {status === "loading" ? (
             <span className="text-muted">loading live chain</span>
