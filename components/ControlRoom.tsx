@@ -56,7 +56,7 @@ export function ControlRoom() {
         </span>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <main className="grid gap-4 lg:grid-cols-3">
         <Panel title="Two-region link" kicker="strong consistency" className="lg:col-span-3">
           <RegionArcMap
             east={east.status}
@@ -126,7 +126,7 @@ export function ControlRoom() {
         >
           <RegulatoryPanel />
         </Panel>
-      </div>
+      </main>
     </div>
   );
 }
