@@ -75,9 +75,9 @@ const ROWS: RegRow[] = [
   },
   {
     reg: "UK Online Safety Act 2023",
-    citation: "c.50, s.12 (Ofcom)",
+    citation: "c.50, s.12",
     obligation:
-      "Services likely to be accessed by children must apply highly effective age assurance and proportionate protection.",
+      "Services likely to be accessed by children must apply highly effective age assurance and proportionate protection, enforced by Ofcom.",
     supports: "age-assurance record",
     anchor: "age-verification",
     href: "https://www.legislation.gov.uk/ukpga/2023/50/section/12/enacted",
